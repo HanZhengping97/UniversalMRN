@@ -25,6 +25,14 @@ from matplotlib.patches import Wedge
 
 from src.export import export_branches_csv
 from src.mesh import Branch, Cell, Mesh, MeshGenerator, validate_branch_topology
+from src.mrn import apply_reference_node, build_branch_permeance_matrix, build_nodal_permeance_matrix
+from src.topology import (
+    build_incidence_matrix,
+    build_topology_index,
+    find_connected_components,
+    validate_connected_mesh,
+    validate_incidence_matrix,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -188,10 +196,46 @@ def print_mesh_summary(mesh: Mesh, config: DssrAfpmConfig) -> None:
         print(f"  material {material_id}: {count} cells")
 
 
+def print_matrix_assembly_summary(mesh: Mesh) -> None:
+    """Build and print Phase 3 MRN matrix assembly diagnostics."""
+
+    index = build_topology_index(mesh)
+    incidence_matrix = build_incidence_matrix(mesh)
+    validate_incidence_matrix(mesh, incidence_matrix, index)
+
+    # Uniform values are temporary placeholders for Phase 4 physical permeance calculations.
+    branch_permeances = {branch_id: 1.0 for branch_id in mesh.branches}
+    branch_permeance_matrix = build_branch_permeance_matrix(mesh, branch_permeances, index)
+    nodal_matrix = build_nodal_permeance_matrix(incidence_matrix, branch_permeance_matrix)
+
+    components = find_connected_components(mesh)
+    validate_connected_mesh(mesh)
+    reference_row = 0
+    reference_node_id = index.row_to_node_id[reference_row]
+    reduced_nodal_matrix = apply_reference_node(nodal_matrix, reference_row)
+
+    print("DSSR AFPM MRN matrix assembly")
+    print(f"Number of nodes: {mesh.number_of_nodes}")
+    print(f"Number of branches: {mesh.number_of_branches}")
+    print(f"A shape: {incidence_matrix.shape}")
+    print(f"A nonzero entries: {incidence_matrix.nnz}")
+    print(f"Gb shape: {branch_permeance_matrix.shape}")
+    print(f"Gb nonzero entries: {branch_permeance_matrix.nnz}")
+    print(f"Gn shape: {nodal_matrix.shape}")
+    print(f"Gn nonzero entries: {nodal_matrix.nnz}")
+    print(f"Connected components: {len(components)}")
+    print(f"Reference node ID: {reference_node_id}")
+    print(f"Reduced Gn shape: {reduced_nodal_matrix.shape}")
+    print("Incidence validation: passed")
+    print("Connectivity validation: passed")
+    print("Matrix assembly: passed")
+
+
 if __name__ == "__main__":
     config = DssrAfpmConfig()
     dssr_mesh = generate_dssr_afpm_mesh(config)
     print_mesh_summary(dssr_mesh, config)
+    print_matrix_assembly_summary(dssr_mesh)
     branches_csv = export_branches_csv(dssr_mesh, Path("output/branches.csv"))
     print(f"Branch CSV: {branches_csv}")
     for saved_file in save_dssr_afpm_figures():
