@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .branch import Branch, BranchOrientation
 from .cell import Cell
 from .mesh import Mesh
 from .node import Node
@@ -78,4 +79,58 @@ class MeshGenerator:
                 )
                 cell_id += 1
 
+        MeshGenerator.generate_structured_branches(mesh, nx=nx, ny=ny)
         return mesh
+
+    @staticmethod
+    def generate_structured_branches(mesh: Mesh, nx: int, ny: int) -> None:
+        """Generate directed adjacent-node branches for a structured mesh.
+
+        Numbering convention: all radial branches are generated first, then all
+        axial branches.  Radial branch ids increase with radial index ``i``
+        inside each axial row ``j``; axial branch ids increase with radial index
+        ``i`` inside each axial interval ``j``.  Node ids are assumed to follow
+        the structured convention ``node_id = j * (nx + 1) + i``.
+        """
+
+        if nx <= 0:
+            raise ValueError("nx must be positive.")
+        if ny <= 0:
+            raise ValueError("ny must be positive.")
+        if mesh.branches:
+            raise ValueError("mesh already contains branches.")
+
+        branch_id = 0
+        for j in range(ny + 1):
+            for i in range(nx):
+                start = mesh.get_node(j * (nx + 1) + i)
+                end = mesh.get_node(j * (nx + 1) + i + 1)
+                mesh.add_branch(
+                    Branch(
+                        id=branch_id,
+                        start_node_id=start.id,
+                        end_node_id=end.id,
+                        orientation=BranchOrientation.RADIAL,
+                        length=end.r - start.r,
+                        center_r=0.5 * (start.r + end.r),
+                        center_z=start.z,
+                    )
+                )
+                branch_id += 1
+
+        for j in range(ny):
+            for i in range(nx + 1):
+                start = mesh.get_node(j * (nx + 1) + i)
+                end = mesh.get_node((j + 1) * (nx + 1) + i)
+                mesh.add_branch(
+                    Branch(
+                        id=branch_id,
+                        start_node_id=start.id,
+                        end_node_id=end.id,
+                        orientation=BranchOrientation.AXIAL,
+                        length=end.z - start.z,
+                        center_r=start.r,
+                        center_z=0.5 * (start.z + end.z),
+                    )
+                )
+                branch_id += 1
