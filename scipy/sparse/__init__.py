@@ -57,7 +57,10 @@ class csr_matrix(spmatrix):
     def __matmul__(self, other):
         if isinstance(other, csr_matrix):
             return csr_matrix(self._array @ other._array)
-        return csr_matrix(self._array @ other)
+        result = self._array @ other
+        if isinstance(result, np.ndarray) and result.ndim == 2:
+            return csr_matrix(result)
+        return result
 
     def __sub__(self, other):
         return csr_matrix(self._array - (other._array if isinstance(other, csr_matrix) else other))
