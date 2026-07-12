@@ -14,6 +14,7 @@ __all__ = [
     "MagneticFieldSolution",
     "recover_magnetic_field_solution",
     "solve_physical_linear_mrn",
+    "solve_permanent_magnet_linear_mrn",
 ]
 
 from .field_state import (
@@ -22,4 +23,5 @@ from .field_state import (
     MagneticFieldSolution,
     recover_magnetic_field_solution,
     solve_physical_linear_mrn,
+    solve_permanent_magnet_linear_mrn,
 )

@@ -32,6 +32,16 @@ __all__ = [
     "PhysicalBranch",
     "build_physical_branch",
     "build_physical_branch_model",
+    "BranchSourceComponents",
+    "PermanentMagnetAssignment",
+    "PermanentMagnetBranchSource",
+    "PermanentMagnetSegmentSource",
+    "branch_direction_vector",
+    "build_branch_source_components",
+    "build_permanent_magnet_assignments",
+    "build_permanent_magnet_branch_source",
+    "build_permanent_magnet_branch_sources",
+    "build_permanent_magnet_excitation",
 ]
 
 from .physical_branch import (
@@ -40,4 +50,17 @@ from .physical_branch import (
     PhysicalBranch,
     build_physical_branch,
     build_physical_branch_model,
+)
+
+from .permanent_magnet_source import (
+    BranchSourceComponents,
+    PermanentMagnetAssignment,
+    PermanentMagnetBranchSource,
+    PermanentMagnetSegmentSource,
+    branch_direction_vector,
+    build_branch_source_components,
+    build_permanent_magnet_assignments,
+    build_permanent_magnet_branch_source,
+    build_permanent_magnet_branch_sources,
+    build_permanent_magnet_excitation,
 )

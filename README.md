@@ -187,3 +187,24 @@ B_r(r) = Phi_b/(Delta_phi*h_z*r)
 ```
 
 The radial segment model therefore preserves the exact logarithmic reluctance and reports signed inner-radius, outer-radius, and representative center-radius B/H diagnostics instead of pretending that radial B is uniform across the segment.
+
+## Permanent-magnet excitation
+
+UniversalMRN supports linear permanent-magnet recoil models using the r-z constitutive relation
+
+```text
+B = mu0*mu_r*H + Br
+```
+
+along each branch direction.  The equivalent branch magnetomotive-force source is
+
+```text
+F_PM = H_c*l_PM*cos(alpha)
+H_c = Br/(mu0*mu_r)
+```
+
+where `alpha` is the angle between the assigned cell magnetization direction and the stored positive branch direction.  Material identity and magnetization direction are intentionally separate: two cells can use the same ferrite material while carrying opposite pole directions.  Source sign follows the immutable branch convention (radial branches point toward increasing `r`; axial branches point toward increasing `z`).  Multiple permanent-magnet segments on the same physical branch add algebraically, so opposing segment magnetizations can cancel.  Magnetization perpendicular to a branch contributes zero source in the current two-dimensional r-z projection.
+
+This is ready for spoke-type ferrite layouts: adjacent cells may alternate `RADIAL_POSITIVE` and `RADIAL_NEGATIVE`; radial branches aligned with the magnetization receive PM MMF, while axial branches through radial magnets receive zero PM source.
+
+Current limitations: linear recoil permeability only; no nonlinear demagnetization curve; no irreversible demagnetization; no temperature dependence; no circumferential magnetization; no rotor-motion coupling yet; and no winding-source generator yet.
