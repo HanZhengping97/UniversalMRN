@@ -1,4 +1,12 @@
-"""solver components for UniversalMRN.
+"""Solver components for UniversalMRN."""
 
-This package is reserved for future scientific functionality.
-"""
+from .excitation import MagneticExcitation, build_magnetic_excitation
+from .linear import solve_linear_mrn
+from .solution import LinearMagneticSolution
+
+__all__ = [
+    "LinearMagneticSolution",
+    "MagneticExcitation",
+    "build_magnetic_excitation",
+    "solve_linear_mrn",
+]
