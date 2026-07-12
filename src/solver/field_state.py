@@ -84,7 +84,7 @@ class MagneticFieldSolution:
 
 def _segment_state(seg, flux: float) -> SegmentFieldState:
     mmf = flux * seg.reluctance
-    if seg.geometry_kind is SegmentGeometryKind.AXIAL_PRISMATIC:
+    if seg.geometry_kind in (SegmentGeometryKind.AXIAL_PRISMATIC, SegmentGeometryKind.CIRCUMFERENTIAL_PRISMATIC):
         b = flux / seg.area; h = b / seg.permeability
         return SegmentFieldState(seg.branch_id, seg.segment_index, seg.cell_id, seg.material_id, flux, b, b, b, h, h, h, mmf)
     ri, ro, hz, span = seg.inner_radius, seg.outer_radius, seg.axial_height, seg.angular_span

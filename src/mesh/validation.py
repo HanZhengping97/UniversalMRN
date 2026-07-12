@@ -63,9 +63,18 @@ def validate_branch_topology(mesh: Mesh) -> None:
                 raise ValueError(f"axial branch {branch.id} must connect nodes with equal r.")
             if not end.z > start.z:
                 raise ValueError(f"axial branch {branch.id} must point from smaller z to larger z.")
+        elif branch.orientation is BranchOrientation.CIRCUMFERENTIAL:
+            if not isclose(start.z, end.z):
+                raise ValueError(f"circumferential branch {branch.id} must connect nodes with equal z.")
+            # Periodic phi-z seam branches may wrap from high phi to low phi;
+            # equal phi would not connect adjacent circumferential cells.
+            if isclose(start.r, end.r):
+                raise ValueError(f"circumferential branch {branch.id} must connect distinct phi positions.")
         else:
             raise ValueError(f"branch {branch.id} has unsupported orientation {branch.orientation}.")
 
+    if mesh.number_of_circumferential_branches:
+        return
     expected_radial = nr * (nz + 1)
     expected_axial = (nr + 1) * nz
     if mesh.number_of_radial_branches != expected_radial:

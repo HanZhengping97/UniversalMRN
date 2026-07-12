@@ -207,4 +207,26 @@ where `alpha` is the angle between the assigned cell magnetization direction and
 
 This is ready for spoke-type ferrite layouts: adjacent cells may alternate `RADIAL_POSITIVE` and `RADIAL_NEGATIVE`; radial branches aligned with the magnetization receive PM MMF, while axial branches through radial magnets receive zero PM source.
 
-Current limitations: linear recoil permeability only; no nonlinear demagnetization curve; no irreversible demagnetization; no temperature dependence; no circumferential magnetization; no rotor-motion coupling yet; and no winding-source generator yet.
+Current limitations: linear recoil permeability only; no nonlinear demagnetization curve; no irreversible demagnetization; no temperature dependence; circumferential magnetization is only used by the new phi-z DSSR model; no rotor-motion coupling yet; and no winding-source generator yet.
+
+## DSSR AFPM phi-z no-load model
+
+UniversalMRN now includes a full-circumference two-dimensional unwrapped `phi-z`
+cell-centered MRN example for a slotted DSSR spoke-type AFPM machine. The model
+contains independent upper/lower slotted stators, two air gaps, a spoke rotor
+with alternating circumferential ferrite PM magnetization, periodic
+circumferential branches, geometry-derived circumferential and axial reluctance,
+a linear no-load PM solve, and air-gap axial flux-density extraction.
+
+Run the demonstration with:
+
+```bash
+python examples/dssr_afpm_phi_z_no_load.py
+```
+
+At runtime it writes ignored figures under `figures/` and CSV exports under
+`output/`. The included dimensions are replaceable demonstration values, not
+optimized machine dimensions. Current limitations include one representative
+radial span, no radial discretization, linear steel, no winding currents, no
+motion sweep, no torque/back-EMF calculation, no saturation, and no fringing or
+end-effect corrections.
