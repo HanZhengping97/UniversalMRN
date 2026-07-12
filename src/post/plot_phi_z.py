@@ -24,7 +24,23 @@ def plot_branches(model, path='figures/dssr_afpm_phi_z_branches.png', decimate=2
     plt.xlabel('mechanical angle [deg]'); plt.ylabel('z [mm]'); plt.tight_layout(); plt.savefig(path); plt.close()
 
 def plot_airgap(result, path='figures/dssr_afpm_airgap_B.png'):
-    Path(path).parent.mkdir(parents=True, exist_ok=True); plt.figure(figsize=(10,4)); plt.plot(np.degrees(result.upper_airgap.phi), result.upper_airgap.flux_density_axial, label='upper'); plt.plot(np.degrees(result.lower_airgap.phi), result.lower_airgap.flux_density_axial, label='lower'); plt.xlabel('mechanical angle [deg]'); plt.ylabel('axial B [T]'); plt.legend(); plt.tight_layout(); plt.savefig(path); plt.close()
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    phi=np.degrees(result.upper_airgap.phi); upper=result.upper_airgap.flux_density_axial; lower=result.lower_airgap.flux_density_axial
+    fig,(ax0,ax1)=plt.subplots(2,1,figsize=(10,7),sharex=True)
+    ax0.plot(phi, upper, label='signed upper $B_z$')
+    ax0.plot(phi, lower, label='signed lower $B_z$')
+    ax0.plot(phi, -lower, '--', label='sign-normalized lower $-B_z$')
+    ax0.set_ylabel('axial B [T]'); ax0.legend()
+    ax1.plot(phi, upper+lower, label='$B_{upper}+B_{lower}$')
+    ax1.axhline(0,color='0.5',lw=.8); ax1.set_xlabel('mechanical angle [deg]'); ax1.set_ylabel('residual [T]'); ax1.legend()
+    fig.tight_layout(); fig.savefig(path); plt.close(fig)
+
+def plot_airgap_harmonics(result, path='figures/dssr_afpm_airgap_harmonics.png'):
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    up=result.upper_airgap_harmonics; low=result.sign_normalized_lower_airgap_harmonics
+    plt.figure(figsize=(10,4)); plt.stem(up.harmonic_orders, up.amplitudes, linefmt='C0-', markerfmt='C0o', basefmt=' ', label='upper')
+    plt.stem(low.harmonic_orders, low.amplitudes, linefmt='C1-', markerfmt='C1s', basefmt=' ', label='sign-normalized lower')
+    plt.xlabel('mechanical spatial harmonic order'); plt.ylabel('amplitude [T]'); plt.legend(); plt.tight_layout(); plt.savefig(path); plt.close()
 
 def generate_all_phi_z_figures(result):
     plot_material_map(result.model); plot_mesh(result.model); plot_branches(result.model); plot_airgap(result)

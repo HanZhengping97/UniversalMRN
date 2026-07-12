@@ -62,3 +62,33 @@ The no-load solve reuses the existing linear scalar-potential MRN solver, then r
 - no nonlinear saturation
 - no fringing correction
 - no end effects
+
+## Upper/lower air-gap sign convention and symmetry diagnostics
+
+All axial branches in the phi-z MRN are directed toward increasing `z`. With this single branch convention, a symmetric DSSR machine does **not** produce equal signed upper and lower axial air-gap fields. Flux crossing the upper air gap from the rotor toward the upper stator is positive `B_z`, while flux crossing the lower air gap from the rotor toward the lower stator is negative `B_z` under the same `+z` branch direction.
+
+The expected signed relation is therefore
+
+```text
+B_upper(phi) ~= -B_lower(phi)
+```
+
+The signed upper/lower symmetry error is computed as
+
+```text
+epsilon_sym = max |B_upper(phi) + B_lower(phi)|
+```
+
+This differs from the old visual comparison `max |B_upper - B_lower|`, which incorrectly treats the two axial branches as if they had opposite reference directions. The backwards-compatible `upper_lower_symmetry_error` property now aliases the signed `B_upper + B_lower` definition.
+
+A separate magnitude-only metric is also reported:
+
+```text
+epsilon_mag = max ||B_upper(phi)| - |B_lower(phi)||
+```
+
+The signed metric validates cancellation under the global axial sign convention. The magnitude metric validates that the absolute field strengths match even if a caller wants a sign-normalized plot such as `B_upper` compared directly with `-B_lower`.
+
+Air-gap extraction validates that selected branches are axial, internal to the intended air-gap region, bounded only by air material, located at matching phi centers, closest to the corresponding air-gap midplane, sorted deterministically, and free of duplicated `0`/`2*pi` endpoint samples. Integrated signed flux diagnostics use each profile sample's annular-sector axial area rather than a raw angular integral.
+
+A lightweight full-circumference Fourier diagnostic reports the DC component, dominant mechanical spatial harmonic, and selected amplitudes. For the default 44-pole example the pole-pair order is `p = pole_count / 2 = 22`; the model reports the amplitude at order 22 without requiring it to be the largest harmonic for all discretizations.

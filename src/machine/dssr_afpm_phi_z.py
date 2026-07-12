@@ -105,6 +105,7 @@ def build_dssr_afpm_phi_z_model(config: DssrAfpmPhiZConfig, *, material_override
     mats=default_materials(config); mats.update(material_overrides or {})
     phi=build_phi_edges(config); z, iface=build_z_edges(config)
     mesh_model=generate_phi_z_mesh(phi,z,config.mean_radius,config.radial_span, lambda pc,zc: classify_region(config, pc, zc, iface), _mat_for)
+    object.__setattr__(mesh_model, 'interface_z', iface)
     assign={cid:(MagnetizationAxis.CIRCUMFERENTIAL_POSITIVE if r is DssrAfpmRegion.PERMANENT_MAGNET_POSITIVE else MagnetizationAxis.CIRCUMFERENTIAL_NEGATIVE) for cid,r in mesh_model.cell_id_to_region.items() if 'PERMANENT_MAGNET' in r.name}
     pm=build_permanent_magnet_assignments(mesh_model.mesh, assign, materials=mats, strict=True)
     phys=_build_physical(config, mesh_model, mats)
@@ -157,6 +158,39 @@ def _airgap_internal_axial_branches(model, region):
             if mm.cell_id_to_region[a] is region and mm.cell_id_to_region[bid2] is region: out.append(bid)
     return tuple(sorted(out))
 
+
+
+@dataclass(frozen=True, slots=True)
+class AirgapHarmonicSpectrum:
+    harmonic_orders: np.ndarray
+    cosine_coefficients: np.ndarray
+    sine_coefficients: np.ndarray
+    amplitudes: np.ndarray
+
+    @property
+    def dc_component(self): return float(self.cosine_coefficients[0])
+
+    @property
+    def dominant_mechanical_order(self):
+        if len(self.amplitudes) <= 1: return 0
+        return int(self.harmonic_orders[1:][int(np.argmax(self.amplitudes[1:]))])
+
+    def amplitude_at(self, order: int):
+        idx=np.where(self.harmonic_orders == order)[0]
+        return float(self.amplitudes[idx[0]]) if len(idx) else 0.0
+
+def compute_airgap_harmonic_spectrum(profile, max_order=None):
+    phi=np.asarray(profile.phi, dtype=float); values=np.asarray(profile.flux_density_axial, dtype=float)
+    if len(phi) != len(values): raise ValueError('profile phi and B arrays must have equal lengths')
+    if max_order is None: max_order=max(1, len(phi)//2)
+    orders=np.arange(max_order+1, dtype=int)
+    cos=np.empty_like(orders, dtype=float); sin=np.empty_like(orders, dtype=float); amp=np.empty_like(orders, dtype=float)
+    cos[0]=float(np.mean(values)); sin[0]=0.0; amp[0]=abs(cos[0])
+    for k in orders[1:]:
+        c=2.0*float(np.mean(values*np.cos(k*phi))); q=2.0*float(np.mean(values*np.sin(k*phi)))
+        cos[k]=c; sin[k]=q; amp[k]=sqrt(c*c+q*q)
+    return AirgapHarmonicSpectrum(orders, cos, sin, amp)
+
 @dataclass(frozen=True, slots=True)
 class DssrAfpmPhiZNoLoadResult:
     model: DssrAfpmPhiZModel; field_solution: MagneticFieldSolution; upper_airgap: Any; lower_airgap: Any
@@ -172,8 +206,46 @@ class DssrAfpmPhiZNoLoadResult:
     def mean_upper_airgap_B(self): return float(np.mean(self.upper_airgap.flux_density_axial))
     @property
     def mean_lower_airgap_B(self): return float(np.mean(self.lower_airgap.flux_density_axial))
+    def _validate_profiles(self):
+        from src.post.airgap import validate_matching_airgap_profiles
+        validate_matching_airgap_profiles(self.upper_airgap, self.lower_airgap)
     @property
-    def upper_lower_symmetry_error(self): return float(np.max(np.abs(self.upper_airgap.flux_density_axial-self.lower_airgap.flux_density_axial)))
+    def signed_upper_lower_symmetry_error(self):
+        self._validate_profiles(); return float(np.max(np.abs(self.upper_airgap.flux_density_axial+self.lower_airgap.flux_density_axial)))
+    @property
+    def magnitude_upper_lower_symmetry_error(self):
+        self._validate_profiles(); return float(np.max(np.abs(np.abs(self.upper_airgap.flux_density_axial)-np.abs(self.lower_airgap.flux_density_axial))))
+    @property
+    def normalized_signed_symmetry_error(self):
+        den=max(self.maximum_upper_airgap_B, self.maximum_lower_airgap_B, np.finfo(float).tiny); return self.signed_upper_lower_symmetry_error/den
+    @property
+    def normalized_magnitude_symmetry_error(self):
+        den=max(self.maximum_upper_airgap_B, self.maximum_lower_airgap_B, np.finfo(float).tiny); return self.magnitude_upper_lower_symmetry_error/den
+    @property
+    def upper_lower_symmetry_error(self):
+        return self.signed_upper_lower_symmetry_error
+    @property
+    def upper_airgap_peak_to_peak_B(self): return float(np.ptp(self.upper_airgap.flux_density_axial))
+    @property
+    def lower_airgap_peak_to_peak_B(self): return float(np.ptp(self.lower_airgap.flux_density_axial))
+    @property
+    def upper_airgap_flux_integral(self): return float(np.sum(self.upper_airgap.flux_density_axial*self.upper_airgap.sample_areas))
+    @property
+    def lower_airgap_flux_integral(self): return float(np.sum(self.lower_airgap.flux_density_axial*self.lower_airgap.sample_areas))
+    @property
+    def total_airgap_flux_balance_error(self): return abs(self.upper_airgap_flux_integral+self.lower_airgap_flux_integral)
+    @property
+    def normalized_total_airgap_flux_balance_error(self):
+        den=max(abs(self.upper_airgap_flux_integral), abs(self.lower_airgap_flux_integral), np.finfo(float).tiny); return self.total_airgap_flux_balance_error/den
+    @property
+    def upper_airgap_harmonics(self): return compute_airgap_harmonic_spectrum(self.upper_airgap)
+    @property
+    def lower_airgap_harmonics(self): return compute_airgap_harmonic_spectrum(self.lower_airgap)
+    @property
+    def sign_normalized_lower_airgap_harmonics(self):
+        from src.post.airgap import AirgapFluxDensityProfile
+        p=AirgapFluxDensityProfile(self.lower_airgap.phi, self.lower_airgap.mechanical_angle, self.lower_airgap.branch_ids, -self.lower_airgap.flux_density_axial, self.lower_airgap.airgap_name, self.lower_airgap.sample_areas)
+        return compute_airgap_harmonic_spectrum(p)
     @property
     def maximum_nodal_residual(self): return float(np.max(np.abs(self.field_solution.linear_solution.nodal_flux_residual)))
 
