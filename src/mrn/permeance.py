@@ -1,7 +1,14 @@
 """Branch permeance matrix framework.
 
-The permeance values accepted here are placeholders until physical geometry and
-material permeance calculation is implemented in a later phase.
+The solver-facing permeance matrix builder accepts already assembled branch
+permeances.  Older structured meshes are vertex-centered; any geometry helper
+that sums cell contributions on those edge branches should be interpreted only
+as a vertex-centered edge dual-area approximation.  Such parallel contribution
+summation is valid only for geometrically parallel paths under the same MMF
+drop, and is not the material-interface model for two materials encountered
+sequentially between neighboring control-volume centers.  Use
+``src.mrn.interface_reluctance`` with the cell-centered mesh generator for the
+preferred control-volume material-interface formulation.
 """
 
 from __future__ import annotations

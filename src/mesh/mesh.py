@@ -21,6 +21,10 @@ class Mesh:
     nodes: dict[int, Node] = field(default_factory=dict)
     cells: dict[int, Cell] = field(default_factory=dict)
     branches: dict[int, Branch] = field(default_factory=dict)
+    cell_id_to_node_id: dict[int, int] = field(default_factory=dict)
+    node_id_to_cell_id: dict[int, int] = field(default_factory=dict)
+    branch_id_to_cell_ids: dict[int, tuple[int, int]] = field(default_factory=dict)
+    cell_centered: bool = False
 
     def add_node(self, node: Node) -> None:
         """Add a node to the mesh.
