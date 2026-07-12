@@ -11,6 +11,7 @@ class BranchOrientation(Enum):
 
     RADIAL = auto()
     AXIAL = auto()
+    CIRCUMFERENTIAL = auto()
 
 
 @dataclass(frozen=True, slots=True)

@@ -92,14 +92,16 @@ def _is_pm(material: Any) -> bool:
     return bool(getattr(material, "is_permanent_magnet", False))
 
 
-def branch_direction_vector(branch: Branch) -> tuple[float, float]:
-    """Return the positive branch direction in (radial, axial) components."""
+def branch_direction_vector(branch: Branch) -> tuple[float, float, float]:
+    """Return the positive branch direction in (radial, circumferential, axial) components."""
     if branch.length <= 0.0:
         raise ValueError("branch length must be positive.")
     if branch.orientation is BranchOrientation.RADIAL:
-        return (1.0, 0.0)
+        return (1.0, 0.0, 0.0)
+    if branch.orientation is BranchOrientation.CIRCUMFERENTIAL:
+        return (0.0, 1.0, 0.0)
     if branch.orientation is BranchOrientation.AXIAL:
-        return (0.0, 1.0)
+        return (0.0, 0.0, 1.0)
     raise ValueError("unsupported branch orientation.")
 
 
@@ -124,6 +126,8 @@ def _magnetized_length(segment) -> float:
         return float(segment.length)
     if segment.geometry_kind is SegmentGeometryKind.RADIAL_CYLINDRICAL:
         return float(segment.outer_radius) - float(segment.inner_radius)
+    if segment.geometry_kind is SegmentGeometryKind.CIRCUMFERENTIAL_PRISMATIC:
+        return float(segment.length)
     raise ValueError("unsupported segment geometry kind.")
 
 
@@ -139,8 +143,8 @@ def build_permanent_magnet_branch_source(physical_branch: PhysicalBranch, materi
             raise ValueError(f"missing magnetization assignment for PM cell {seg.cell_id}.")
         assignment = magnet_assignments[seg.cell_id]
         direction = assignment.magnetization if isinstance(assignment, PermanentMagnetAssignment) else coerce_magnetization_direction(assignment)
-        m_hat = direction.unit_vector
-        projection = max(-1.0, min(1.0, m_hat[0] * b_hat[0] + m_hat[1] * b_hat[1]))
+        m_hat = direction.unit_vector_3d
+        projection = max(-1.0, min(1.0, m_hat[0] * b_hat[0] + m_hat[1] * b_hat[1] + m_hat[2] * b_hat[2]))
         length = _magnetized_length(seg)
         hc = float(mat.coercive_field_strength)
         sources.append(PermanentMagnetSegmentSource(seg.branch_id, seg.segment_index, seg.cell_id, seg.material_id, hc, projection, length, hc * length * projection))

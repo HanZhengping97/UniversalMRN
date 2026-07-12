@@ -128,6 +128,12 @@ class Mesh:
         return sum(1 for branch in self.branches.values() if branch.orientation is BranchOrientation.RADIAL)
 
     @property
+    def number_of_circumferential_branches(self) -> int:
+        """Number of circumferential branches in the mesh."""
+
+        return sum(1 for branch in self.branches.values() if branch.orientation is BranchOrientation.CIRCUMFERENTIAL)
+
+    @property
     def number_of_axial_branches(self) -> int:
         """Number of axial branches in the mesh."""
 

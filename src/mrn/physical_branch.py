@@ -12,6 +12,7 @@ from .interface_reluctance import MU0, calculate_branch_reluctance_segments
 class SegmentGeometryKind(Enum):
     AXIAL_PRISMATIC = auto()
     RADIAL_CYLINDRICAL = auto()
+    CIRCUMFERENTIAL_PRISMATIC = auto()
 
 def _pos(v: float, name: str) -> float:
     v = float(v)
@@ -64,6 +65,8 @@ class PhysicalBranchSegment:
         _nonneg(self.cell_id, "cell_id"); _nonneg(self.material_id, "material_id")
         _pos(self.length, "length"); _pos(self.area, "area"); _pos(self.permeability, "permeability"); _pos(self.reluctance, "reluctance")
         if self.geometry_kind is SegmentGeometryKind.AXIAL_PRISMATIC:
+            expected = self.length / (self.permeability * self.area)
+        elif self.geometry_kind is SegmentGeometryKind.CIRCUMFERENTIAL_PRISMATIC:
             expected = self.length / (self.permeability * self.area)
         elif self.geometry_kind is SegmentGeometryKind.RADIAL_CYLINDRICAL:
             ri = _pos(self.inner_radius, "inner_radius"); ro = _pos(self.outer_radius, "outer_radius")
