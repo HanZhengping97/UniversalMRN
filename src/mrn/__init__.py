@@ -27,4 +27,17 @@ __all__ = [
     "build_branch_permeance_matrix",
     "build_nodal_permeance_matrix",
     "remove_reference_entry",
+    "SegmentGeometryKind",
+    "PhysicalBranchSegment",
+    "PhysicalBranch",
+    "build_physical_branch",
+    "build_physical_branch_model",
 ]
+
+from .physical_branch import (
+    SegmentGeometryKind,
+    PhysicalBranchSegment,
+    PhysicalBranch,
+    build_physical_branch,
+    build_physical_branch_model,
+)
