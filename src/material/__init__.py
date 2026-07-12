@@ -1,4 +1,5 @@
-"""material components for UniversalMRN.
+"""Magnetic material models for UniversalMRN."""
 
-This package is reserved for future scientific functionality.
-"""
+from .linear import MU_0, LinearMagneticMaterial, validate_material_library
+
+__all__ = ["MU_0", "LinearMagneticMaterial", "validate_material_library"]
