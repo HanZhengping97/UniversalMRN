@@ -52,7 +52,7 @@ class BranchFieldState:
 
 @dataclass(frozen=True, slots=True)
 class MagneticFieldSolution:
-    linear_solution: LinearMagneticSolution; branches: Mapping[int, BranchFieldState]
+    linear_solution: LinearMagneticSolution; branches: Mapping[int, BranchFieldState]; excitation_diagnostics: object | None = None
     def __post_init__(self) -> None:
         ordered = dict(sorted(self.branches.items()))
         if len(ordered) != self.linear_solution.number_of_branches: raise ValueError("branch count must match linear solution.")
@@ -104,6 +104,42 @@ def recover_magnetic_field_solution(mesh: Mesh, physical_branches: Mapping[int, 
         seg_states = tuple(_segment_state(s, flux) for s in pb.segments)
         states[bid] = BranchFieldState(bid, source, drop, net, flux, pb.reluctance, pb.permeance, seg_states)
     return MagneticFieldSolution(linear_solution, states)
+
+def solve_permanent_magnet_linear_mrn(mesh, materials, magnet_assignments, *, additional_branch_mmf_by_id=None, angular_span=2*pi, reference_node_id=None, reference_potential=0.0, residual_tolerance=1e-9) -> MagneticFieldSolution:
+    from src.mrn.permanent_magnet_source import build_branch_source_components, build_permanent_magnet_branch_sources, build_permanent_magnet_excitation
+    physical = build_physical_branch_model(mesh, materials, angular_span=angular_span)
+    branch_sources = build_permanent_magnet_branch_sources(mesh, physical, materials, magnet_assignments)
+    excitation = build_permanent_magnet_excitation(mesh, physical, materials, magnet_assignments, additional_branch_mmf_by_id=additional_branch_mmf_by_id)
+    linear = solve_linear_mrn(mesh, {bid: b.permeance for bid,b in physical.items()}, excitation, reference_node_id=reference_node_id, reference_potential=reference_potential, residual_tolerance=residual_tolerance)
+    solution = recover_magnetic_field_solution(mesh, physical, linear)
+    source_by_segment = {(src.branch_id, src.segment_index): src for branch_src in branch_sources.values() for src in branch_src.segment_sources}
+    adjusted_branches = {}
+    for bid, branch_state in solution.branches.items():
+        adjusted_segments = []
+        for seg_state in branch_state.segment_states:
+            src = source_by_segment.get((seg_state.branch_id, seg_state.segment_index))
+            if src is None:
+                adjusted_segments.append(seg_state)
+                continue
+            h_offset = src.coercive_field_strength * src.magnetization_projection
+            adjusted_segments.append(SegmentFieldState(
+                seg_state.branch_id, seg_state.segment_index, seg_state.cell_id, seg_state.material_id,
+                seg_state.flux, seg_state.flux_density_average, seg_state.flux_density_min, seg_state.flux_density_max,
+                seg_state.magnetic_field_strength_average - h_offset,
+                seg_state.magnetic_field_strength_min - h_offset,
+                seg_state.magnetic_field_strength_max - h_offset,
+                seg_state.mmf_drop,
+            ))
+        adjusted_branches[bid] = BranchFieldState(
+            branch_state.branch_id, branch_state.source_mmf, branch_state.potential_drop, branch_state.net_mmf, branch_state.flux,
+            branch_state.equivalent_reluctance, branch_state.equivalent_permeance, tuple(adjusted_segments)
+        )
+    solution = MagneticFieldSolution(linear, adjusted_branches)
+    object.__setattr__(solution, "excitation_diagnostics", {
+        "branch_sources": branch_sources,
+        "source_components": build_branch_source_components(mesh, branch_sources, additional_branch_mmf_by_id),
+    })
+    return solution
 
 def solve_physical_linear_mrn(mesh, materials, excitation: MagneticExcitation | None = None, *, angular_span=2*pi, reference_node_id=None, reference_potential=0.0, residual_tolerance=1e-9) -> MagneticFieldSolution:
     physical = build_physical_branch_model(mesh, materials, angular_span=angular_span)
