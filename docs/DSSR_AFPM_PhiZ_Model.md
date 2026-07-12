@@ -92,3 +92,31 @@ The signed metric validates cancellation under the global axial sign convention.
 Air-gap extraction validates that selected branches are axial, internal to the intended air-gap region, bounded only by air material, located at matching phi centers, closest to the corresponding air-gap midplane, sorted deterministically, and free of duplicated `0`/`2*pi` endpoint samples. Integrated signed flux diagnostics use each profile sample's annular-sector axial area rather than a raw angular integral.
 
 A lightweight full-circumference Fourier diagnostic reports the DC component, dominant mechanical spatial harmonic, and selected amplitudes. For the default 44-pole example the pole-pair order is `p = pole_count / 2 = 22`; the model reports the amplitude at order 22 without requiring it to be the largest harmonic for all discretizations.
+
+## Physical interpretation of the spoke rotor
+
+The DSSR AFPM phi-z model represents a mean-radius unwrap of the real three-dimensional spoke rotor. In the physical annulus, the permanent magnets are radial spoke bars. At the representative mean radius used by the two-dimensional phi-z mesh, each radial bar appears as a narrow circumferential interval extending through the rotor axial thickness.
+
+The rotor angular convention is based on `pole_count = Np` and `pole_pitch = 2*pi/Np`. Spoke-magnet centers are located at
+
+```text
+phi_pm,k = rotor_mechanical_angle + magnet_position_offset + k * pole_pitch
+```
+
+and rotor-iron pole-piece centers are halfway between adjacent magnets:
+
+```text
+phi_pole,k = rotor_mechanical_angle + magnet_position_offset + (k + 0.5) * pole_pitch
+```
+
+The resulting unwrapped sequence is therefore:
+
+```text
+PM+ | iron pole | PM- | iron pole | PM+
+```
+
+The preferred geometry parameter is `magnet_arc_ratio = magnet_angular_width / pole_pitch`. The default 44-pole example uses `magnet_arc_ratio = 0.20`, so the demonstration rotor has a narrow 20% pole-pitch magnet interval and a wide 80% pole-pitch rotor-iron pole-piece interval. This is a replaceable demonstration value, not an optimized design result. A physical thesis-style magnet width can still be supplied as `magnet_circumferential_width`; internally it is converted to angular width by dividing by mean radius and must agree with the ratio if both inputs are provided.
+
+The magnetization in the PM intervals is circumferential and alternates `+phi`, `-phi`, `+phi`, ... around the circumference. Circumferential branches through PM cells therefore receive permanent-magnet MMF, while axial PM branches receive zero PM source. The rotor iron between neighboring magnets is modeled as `ROTOR_IRON_POLE`; it carries no permanent-magnet source and forms the geometric axial pole face toward the upper and lower air gaps. The pole-face diagnostic infers alternating `N, S, N, S, ...` source polarity from the neighboring magnet directions; it is a geometric/source-polarity diagnostic, not a nonlinear surface-flux solution.
+
+This phi-z model captures the circumferential source action of the spoke magnets and the axial air-gap flux leaving the rotor-iron pole pieces toward both stators while retaining the existing linear magnetic-reluctance-network solver. Radial bridges, inner/outer retaining structures, radial leakage paths, nonlinear saturation, winding excitation, torque, back-EMF, and rotor-motion sweeping are not represented in this refinement.

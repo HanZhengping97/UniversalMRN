@@ -25,11 +25,17 @@ def build_phi_edges(config) -> tuple[float,...]:
         for k in range(config.slot_count):
             c=base+k*config.slot_pitch_angle
             _add_edge(edges,c-sop); _add_edge(edges,c+sop)
-    mw=0.5*config.magnet_circumferential_width/config.mean_radius
+    mw=0.5*config.magnet_angular_width
     base=config.magnet_position_offset+config.rotor_mechanical_angle
     for k in range(config.pole_count):
         c=base+k*config.pole_pitch_angle
         _add_edge(edges,c-mw); _add_edge(edges,c+mw)
+        _add_edge(edges,c+0.5*config.pole_pitch_angle)
+        for n in range(1, config.magnet_cells_across_width):
+            _add_edge(edges, c-mw+n*config.magnet_angular_width/config.magnet_cells_across_width)
+        iron_start=c+mw; iron_width=config.rotor_iron_pole_angular_width
+        for n in range(1, config.rotor_iron_cells_per_pole):
+            _add_edge(edges, iron_start+n*iron_width/config.rotor_iron_cells_per_pole)
     vals=sorted(edges)
     out=[]
     for v in vals:

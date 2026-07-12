@@ -11,7 +11,7 @@ def test_phi_z_grid_and_topology():
         center=c.slot_phase_offset+k*c.slot_pitch_angle; half=.5*c.slot_opening_ratio*c.slot_pitch_angle
         assert any(math.isclose(e%(2*math.pi),(center-half)%(2*math.pi),abs_tol=1e-11) for e in phi)
         assert any(math.isclose(e%(2*math.pi),(center+half)%(2*math.pi),abs_tol=1e-11) for e in phi)
-    half=.5*c.magnet_circumferential_width/c.mean_radius
+    half=.5*c.magnet_angular_width
     for k in range(c.pole_count):
         center=c.magnet_position_offset+c.rotor_mechanical_angle+k*c.pole_pitch_angle
         assert any(math.isclose(e%(2*math.pi),(center-half)%(2*math.pi),abs_tol=1e-11) for e in phi)
