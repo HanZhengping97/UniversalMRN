@@ -9,4 +9,17 @@ __all__ = [
     "MagneticExcitation",
     "build_magnetic_excitation",
     "solve_linear_mrn",
+    "SegmentFieldState",
+    "BranchFieldState",
+    "MagneticFieldSolution",
+    "recover_magnetic_field_solution",
+    "solve_physical_linear_mrn",
 ]
+
+from .field_state import (
+    SegmentFieldState,
+    BranchFieldState,
+    MagneticFieldSolution,
+    recover_magnetic_field_solution,
+    solve_physical_linear_mrn,
+)

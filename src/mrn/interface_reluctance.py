@@ -157,4 +157,5 @@ def calculate_cell_centered_branch_permeance(mesh: Mesh, branch: Branch, materia
 
 
 def calculate_cell_centered_mesh_branch_permeances(mesh: Mesh, materials: Mapping[int, Any], *, angular_span: float = 2.0 * pi) -> dict[int, float]:
-    return {branch_id: calculate_cell_centered_branch_permeance(mesh, mesh.branches[branch_id], materials, angular_span=angular_span) for branch_id in sorted(mesh.branches)}
+    from .physical_branch import build_physical_branch_model
+    return {branch_id: physical.permeance for branch_id, physical in build_physical_branch_model(mesh, materials, angular_span=angular_span).items()}

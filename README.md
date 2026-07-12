@@ -150,3 +150,40 @@ paths are geometrically parallel under the same MMF drop, but it is not the
 control-volume formula for two materials encountered sequentially between
 neighboring cell centers.  The cell-centered formulation is the preferred basis
 for future DSSR AFPM non-parametric MRN material-interface calculations.
+
+## Physical branch model and field recovery
+
+UniversalMRN keeps three layers separate:
+
+| Layer | Type | Responsibility |
+| --- | --- | --- |
+| Topology | `Branch` | Branch ID, start/end node IDs, orientation, geometric center, and center-to-center length. |
+| Physical model | `PhysicalBranch` / `PhysicalBranchSegment` | Immutable material, segment geometry, permeability, reluctance, permeance, and branch-equivalent values for one assembled model. |
+| Solution state | `BranchFieldState` / `SegmentFieldState` | Immutable solved quantities such as source MMF, scalar-potential drop, net MMF, flux, B/H diagnostics, and residual checks. |
+
+Mutable solution quantities are intentionally not stored on `Branch`.  A branch is a reusable topology/geometry object, while material assignments and excitation-dependent fields can change between analyses.  Keeping physical parameters and solution state in separate frozen models prevents stale flux, B, H, or MMF values from being attached to the mesh topology.
+
+For a physical branch assembled from series segments,
+
+```text
+R_b = sum_k R_k
+G_b = 1/R_b
+F_net = F_source - Delta_psi
+Phi_b = G_b F_net
+F_k = Phi_b R_k
+```
+
+For axial prismatic segments, the recovered uniform field diagnostics are
+
+```text
+B_k = Phi_b/A_k
+H_k = B_k/mu_k
+```
+
+For radial cylindrical segments, the exact local radial flux density varies with radius:
+
+```text
+B_r(r) = Phi_b/(Delta_phi*h_z*r)
+```
+
+The radial segment model therefore preserves the exact logarithmic reluctance and reports signed inner-radius, outer-radius, and representative center-radius B/H diagnostics instead of pretending that radial B is uniform across the segment.
