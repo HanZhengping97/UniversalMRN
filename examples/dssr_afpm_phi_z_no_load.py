@@ -4,6 +4,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import csv
 import numpy as np
 from src.machine.dssr_afpm_phi_z import default_dssr_afpm_phi_z_config, build_dssr_afpm_phi_z_model, solve_dssr_afpm_phi_z_no_load, DssrAfpmRegion
+from src.post.plot_phi_z import generate_all_phi_z_figures
 
 def export(model,result):
     Path('output').mkdir(exist_ok=True)
@@ -25,7 +26,7 @@ def export(model,result):
 
 def main():
     cfg=default_dssr_afpm_phi_z_config(); model=build_dssr_afpm_phi_z_model(cfg); result=solve_dssr_afpm_phi_z_no_load(model)
-    export(model,result)
+    export(model,result); generate_all_phi_z_figures(result)
     p=cfg.pole_count//2; h=result.upper_airgap_harmonics
     print(f'cells={model.mesh.number_of_cells} branches={model.mesh.number_of_branches} pm_cells={model.number_of_pm_cells}')
     print(f'upper airgap max/RMS/mean B={result.maximum_upper_airgap_B:.6g}/{result.rms_upper_airgap_B:.6g}/{result.mean_upper_airgap_B:.6g} T')

@@ -2,10 +2,11 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum, auto
-from math import pi, isfinite, sqrt
+from math import pi, isfinite, sqrt, floor
 from types import MappingProxyType
 from typing import Mapping, Any
 from collections import Counter
+import warnings
 import numpy as np
 from src.material import LinearMagneticMaterial, LinearPermanentMagnetMaterial, MagnetizationAxis, MU_0
 from src.mesh.phi_z import PhiZMeshModel, generate_phi_z_mesh, periodic_angle, build_phi_edges, build_z_edges
@@ -18,7 +19,7 @@ AIR, STATOR_STEEL, ROTOR_STEEL, FERRITE = 0, 1, 2, 3
 
 class DssrAfpmRegion(Enum):
     UPPER_STATOR_YOKE = auto(); UPPER_STATOR_TOOTH = auto(); UPPER_SLOT_AIR = auto(); UPPER_AIRGAP = auto()
-    ROTOR_IRON = auto(); PERMANENT_MAGNET_POSITIVE = auto(); PERMANENT_MAGNET_NEGATIVE = auto()
+    ROTOR_IRON_POLE = auto(); PERMANENT_MAGNET_POSITIVE = auto(); PERMANENT_MAGNET_NEGATIVE = auto()
     LOWER_AIRGAP = auto(); LOWER_SLOT_AIR = auto(); LOWER_STATOR_TOOTH = auto(); LOWER_STATOR_YOKE = auto()
 
 @dataclass(frozen=True, slots=True)
@@ -26,29 +27,38 @@ class DssrAfpmPhiZConfig:
     outer_diameter: float = 0.301; inner_diameter: float = 0.180
     slot_count: int = 36; pole_count: int = 44
     stator_yoke_thickness: float = 0.010; stator_tooth_height: float = 0.015; slot_opening_ratio: float = 0.45
-    airgap_length: float = 0.001; rotor_axial_thickness: float = 0.012; magnet_circumferential_width: float = 0.004
+    airgap_length: float = 0.001; rotor_axial_thickness: float = 0.012; magnet_circumferential_width: float | None = None
+    magnet_arc_ratio: float | None = None
     upper_stator_axial_offset: float = 0.0; lower_stator_axial_offset: float = 0.0
-    circumferential_cells_per_slot: int = 2; upper_yoke_layers: int = 1; upper_tooth_layers: int = 2; upper_airgap_layers: int = 2
+    circumferential_cells_per_slot: int = 1; upper_yoke_layers: int = 1; upper_tooth_layers: int = 2; upper_airgap_layers: int = 2
     rotor_layers: int = 2; lower_airgap_layers: int = 2; lower_tooth_layers: int = 2; lower_yoke_layers: int = 1
     angular_span: float = 2*pi
     slot_phase_offset: float = 0.0; rotor_mechanical_angle: float = 0.0; upper_stator_slot_offset: float = 0.0; lower_stator_slot_offset: float = 0.0; magnet_position_offset: float = 0.0
     stator_steel_relative_permeability: float = 1000.0; rotor_steel_relative_permeability: float = 1000.0
     ferrite_remanence: float = 0.45; ferrite_relative_permeability: float = 1.05
-    circumferential_cells_per_pole: int = 1
+    circumferential_cells_per_pole: int = 1; magnet_cells_across_width: int = 2; rotor_iron_cells_per_pole: int = 2
     def __post_init__(self):
-        for n in ['outer_diameter','inner_diameter','stator_yoke_thickness','stator_tooth_height','airgap_length','rotor_axial_thickness','magnet_circumferential_width']:
+        for n in ['outer_diameter','inner_diameter','stator_yoke_thickness','stator_tooth_height','airgap_length','rotor_axial_thickness']:
             v=getattr(self,n)
             if not isfinite(v) or v<=0: raise ValueError(f'{n} must be positive and finite')
         if self.outer_diameter <= self.inner_diameter: raise ValueError('outer_diameter must exceed inner_diameter')
         if self.slot_count <= 0: raise ValueError('slot_count must be positive')
         if self.pole_count <= 0 or self.pole_count % 2: raise ValueError('pole_count must be positive and even')
         if not 0 < self.slot_opening_ratio < 1: raise ValueError('slot_opening_ratio must be between 0 and 1')
-        for n in ['circumferential_cells_per_slot','upper_yoke_layers','upper_tooth_layers','upper_airgap_layers','rotor_layers','lower_airgap_layers','lower_tooth_layers','lower_yoke_layers','circumferential_cells_per_pole']:
+        for n in ['circumferential_cells_per_slot','upper_yoke_layers','upper_tooth_layers','upper_airgap_layers','rotor_layers','lower_airgap_layers','lower_tooth_layers','lower_yoke_layers','circumferential_cells_per_pole','magnet_cells_across_width','rotor_iron_cells_per_pole']:
             if getattr(self,n) <= 0: raise ValueError(f'{n} must be positive')
         if self.circumferential_cells_per_slot < 1: raise ValueError('circumferential_cells_per_slot too small')
         if self.upper_airgap_layers < 2 or self.lower_airgap_layers < 2 or self.rotor_layers < 2: raise ValueError('air gaps and rotor require at least two layers')
         if abs(self.angular_span-2*pi)>1e-12: raise ValueError('angular_span must be 2*pi')
-        if self.magnet_circumferential_width >= self.mean_radius*self.pole_pitch_angle: raise ValueError('magnet width must be smaller than pole pitch')
+        width_ratio=None
+        if self.magnet_circumferential_width is not None:
+            if not isfinite(self.magnet_circumferential_width) or self.magnet_circumferential_width <= 0: raise ValueError('magnet_circumferential_width must be positive and finite')
+            width_ratio=(self.magnet_circumferential_width/self.mean_radius)/self.pole_pitch_angle
+        ratio=0.20 if self.magnet_arc_ratio is None and width_ratio is None else (width_ratio if self.magnet_arc_ratio is None else self.magnet_arc_ratio)
+        if not isfinite(ratio) or not 0 < ratio < 1: raise ValueError('magnet_arc_ratio must be between 0 and 1')
+        if width_ratio is not None and self.magnet_arc_ratio is not None and abs(width_ratio-ratio)>1e-9: raise ValueError('magnet_circumferential_width is inconsistent with magnet_arc_ratio')
+        object.__setattr__(self, 'magnet_arc_ratio', float(ratio))
+        if ratio >= 0.5: warnings.warn('magnet_arc_ratio >= 0.5 is valid for research, but the spoke-type demonstration is clearer below 0.5.', UserWarning, stacklevel=2)
     @property
     def outer_radius(self): return self.outer_diameter/2
     @property
@@ -63,6 +73,12 @@ class DssrAfpmPhiZConfig:
     def pole_pitch_angle(self): return 2*pi/self.pole_count
     @property
     def circumferential_length(self): return self.mean_radius*self.angular_span
+    @property
+    def magnet_angular_width(self): return self.magnet_arc_ratio*self.pole_pitch_angle
+    @property
+    def rotor_iron_pole_angular_width(self): return self.pole_pitch_angle-self.magnet_angular_width
+    @property
+    def rotor_iron_arc_ratio(self): return 1.0-self.magnet_arc_ratio
     @property
     def total_axial_length(self): return 2*self.stator_yoke_thickness+2*self.stator_tooth_height+2*self.airgap_length+self.rotor_axial_thickness
     @property
@@ -93,7 +109,7 @@ class DssrAfpmPhiZModel:
 def _mat_for(r):
     if 'SLOT_AIR' in r.name or 'AIRGAP' in r.name: return AIR
     if 'MAGNET' in r.name: return FERRITE
-    if 'ROTOR' in r.name: return ROTOR_STEEL
+    if 'ROTOR_IRON' in r.name: return ROTOR_STEEL
     return STATOR_STEEL
 
 def default_dssr_afpm_phi_z_config(**kw): return DssrAfpmPhiZConfig(**kw)
@@ -117,7 +133,7 @@ def classify_region(c, phi, z, iface):
     if z < iface['lower_rotor_surface_z']: return DssrAfpmRegion.LOWER_AIRGAP
     if z < iface['upper_rotor_surface_z']:
         k=_pm_index(c, phi)
-        if k is None: return DssrAfpmRegion.ROTOR_IRON
+        if k is None: return DssrAfpmRegion.ROTOR_IRON_POLE
         return DssrAfpmRegion.PERMANENT_MAGNET_POSITIVE if k%2==0 else DssrAfpmRegion.PERMANENT_MAGNET_NEGATIVE
     if z < iface['upper_stator_surface_z']: return DssrAfpmRegion.UPPER_AIRGAP
     if z < iface['upper_tooth_yoke_interface_z']: return DssrAfpmRegion.UPPER_SLOT_AIR if _in_slot(c, phi, c.upper_stator_slot_offset) else DssrAfpmRegion.UPPER_STATOR_TOOTH
@@ -126,9 +142,9 @@ def classify_region(c, phi, z, iface):
 def _in_slot(c, phi, offset): return abs(periodic_angle(phi-(c.slot_phase_offset+offset), c.slot_pitch_angle)) <= 0.5*c.slot_opening_ratio*c.slot_pitch_angle + 1e-12
 
 def _pm_index(c, phi):
-    width=c.magnet_circumferential_width/c.mean_radius
+    width=c.magnet_angular_width
     base=c.magnet_position_offset+c.rotor_mechanical_angle
-    raw=(phi-base)/c.pole_pitch_angle; k=round(raw)
+    raw=(phi-base)/c.pole_pitch_angle; k=floor(raw+0.5)
     if abs(periodic_angle(phi-(base+k*c.pole_pitch_angle), 2*pi)) <= 0.5*width+1e-12: return k % c.pole_count
     return None
 
@@ -257,3 +273,44 @@ def solve_dssr_afpm_phi_z_no_load(model, *, reference_node_id=None, residual_tol
     bs=build_permanent_magnet_branch_sources(model.mesh, model.physical_branches, model.materials, model.permanent_magnet_assignments)
     object.__setattr__(sol,'excitation_diagnostics',{'branch_sources':bs,'source_components':build_branch_source_components(model.mesh,bs)})
     return DssrAfpmPhiZNoLoadResult(model, sol, extract_upper_airgap_profile(model, sol), extract_lower_airgap_profile(model, sol))
+
+
+# Backward-compatible enum alias for callers that still import ROTOR_IRON.
+DssrAfpmRegion.ROTOR_IRON = DssrAfpmRegion.ROTOR_IRON_POLE
+
+@dataclass(frozen=True, slots=True)
+class RotorPoleFaceSample:
+    phi: float
+    region: DssrAfpmRegion
+    magnet_index: int | None
+    pole_piece_index: int | None
+    expected_polarity: str | None
+
+@dataclass(frozen=True, slots=True)
+class RotorPoleFaceProfile:
+    surface: str
+    samples: tuple[RotorPoleFaceSample, ...]
+
+def magnet_centers(c):
+    base=c.rotor_mechanical_angle+c.magnet_position_offset
+    return tuple((base+k*c.pole_pitch_angle)%(2*pi) for k in range(c.pole_count))
+
+def rotor_iron_pole_centers(c):
+    base=c.rotor_mechanical_angle+c.magnet_position_offset
+    return tuple((base+(k+0.5)*c.pole_pitch_angle)%(2*pi) for k in range(c.pole_count))
+
+def rotor_pole_face_profile(model, surface='upper'):
+    samples=[]; c=model.config
+    for phi in rotor_iron_pole_centers(c):
+        raw=(phi-(c.rotor_mechanical_angle+c.magnet_position_offset))/c.pole_pitch_angle-0.5
+        idx=int(round(raw))%c.pole_count
+        samples.append(RotorPoleFaceSample(phi,DssrAfpmRegion.ROTOR_IRON_POLE,None,idx,'N' if idx%2==0 else 'S'))
+    return RotorPoleFaceProfile(surface, tuple(samples))
+
+def permanent_magnet_source_diagnostics(model):
+    bs=build_permanent_magnet_branch_sources(model.mesh, model.physical_branches, model.materials, model.permanent_magnet_assignments)
+    out=[]
+    for k,mc in enumerate(magnet_centers(model.config)):
+        mmf=sum(src.total_mmf for src in bs.values() for seg in src.segment_sources if seg.cell_id in model.permanent_magnet_assignments and _pm_index(model.config, model.mesh.cells[seg.cell_id].center_x)==k)
+        out.append({'magnet_index':k,'magnet_center_phi':mc,'magnet_source_mmf':mmf,'left_iron_pole_interval':model.config.rotor_iron_pole_angular_width/2,'right_iron_pole_interval':model.config.rotor_iron_pole_angular_width/2})
+    return tuple(out)
